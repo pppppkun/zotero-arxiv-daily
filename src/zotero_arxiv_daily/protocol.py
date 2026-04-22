@@ -20,6 +20,7 @@ class Paper:
     tldr: Optional[str] = None
     affiliations: Optional[list[str]] = None
     score: Optional[float] = None
+    is_pinned: bool = False
 
     def _generate_tldr_with_llm(self, openai_client:OpenAI,llm_params:dict) -> str:
         lang = llm_params.get('language', 'English')
@@ -103,6 +104,28 @@ class Paper:
             logger.warning(f"Failed to generate affiliations of {self.url}: {e}")
             self.affiliations = None
             return None
+
+    def classify_pinned(self, openai_client: OpenAI, llm_params: dict, prompt: str) -> bool:
+        try:
+            paper_text = f"Title: {self.title}\n\nAbstract: {self.abstract}"
+            response = openai_client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You classify papers. Answer with only 'yes' or 'no'.",
+                    },
+                    {"role": "user", "content": f"{prompt}\n\n{paper_text}"},
+                ],
+                **llm_params.get('generation_kwargs', {})
+            )
+            answer = response.choices[0].message.content.strip().lower()
+            self.is_pinned = 'yes' in answer
+            return self.is_pinned
+        except Exception as e:
+            logger.warning(f"Failed to classify pinned status of {self.url}: {e}")
+            self.is_pinned = False
+            return False
+
 @dataclass
 class CorpusPaper:
     title: str

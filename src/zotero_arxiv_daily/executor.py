@@ -111,6 +111,15 @@ class Executor:
             logger.info("Reranking papers...")
             reranked_papers = self.reranker.rerank(all_papers, corpus)
             reranked_papers = reranked_papers[:self.config.executor.max_paper_num]
+            if getattr(self.config.executor, 'pinned', {}).get('enabled', False):
+                logger.info("Classifying papers for pinning...")
+                prompt = self.config.executor.pinned.prompt
+                for p in tqdm(reranked_papers):
+                    p.classify_pinned(self.openai_client, self.config.llm, prompt)
+                reranked_papers = sorted(
+                    reranked_papers,
+                    key=lambda p: (not p.is_pinned, 0)
+                )
             logger.info("Generating TLDR and affiliations...")
             for p in tqdm(reranked_papers):
                 p.generate_tldr(self.openai_client, self.config.llm)

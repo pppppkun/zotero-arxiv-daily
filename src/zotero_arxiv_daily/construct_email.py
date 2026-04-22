@@ -104,28 +104,42 @@ def get_stars(score:float):
         return '<div class="star-wrapper">'+full_star * full_star_num + half_star * half_star_num + '</div>'
 
 
+def _render_paper_block(p: Paper) -> str:
+    rate = round(p.score, 1) if p.score is not None else 'Unknown'
+    author_list = [a for a in p.authors]
+    num_authors = len(author_list)
+    if num_authors <= 5:
+        authors = ', '.join(author_list)
+    else:
+        authors = ', '.join(author_list[:3] + ['...'] + author_list[-2:])
+    if p.affiliations is not None:
+        affiliations = p.affiliations[:5]
+        affiliations = ', '.join(affiliations)
+        if len(p.affiliations) > 5:
+            affiliations += ', ...'
+    else:
+        affiliations = 'Unknown Affiliation'
+    return get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations)
+
+
 def render_email(papers:list[Paper]) -> str:
     parts = []
     if len(papers) == 0 :
         return framework.replace('__CONTENT__', get_empty_html())
-    
-    for p in papers:
-        #rate = get_stars(p.score)
-        rate = round(p.score, 1) if p.score is not None else 'Unknown'
-        author_list = [a for a in p.authors]
-        num_authors = len(author_list)
-        if num_authors <= 5:
-            authors = ', '.join(author_list)
-        else:
-            authors = ', '.join(author_list[:3] + ['...'] + author_list[-2:])
-        if p.affiliations is not None:
-            affiliations = p.affiliations[:5]
-            affiliations = ', '.join(affiliations)
-            if len(p.affiliations) > 5:
-                affiliations += ', ...'
-        else:
-            affiliations = 'Unknown Affiliation'
-        parts.append(get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations))
+
+    pinned_papers = [p for p in papers if getattr(p, 'is_pinned', False)]
+    other_papers = [p for p in papers if not getattr(p, 'is_pinned', False)]
+
+    if pinned_papers:
+        parts.append('<div style="font-size: 18px; font-weight: bold; color: #d9534f; margin: 16px 0 8px 0;">Pinned: Code / Agent / LLM</div>')
+        for p in pinned_papers:
+            parts.append(_render_paper_block(p))
+
+    if other_papers and pinned_papers:
+        parts.append('<div style="font-size: 18px; font-weight: bold; color: #333; margin: 24px 0 8px 0;">Other Papers</div>')
+
+    for p in other_papers:
+        parts.append(_render_paper_block(p))
 
     content = '<br>' + '</br><br>'.join(parts) + '</br>'
     return framework.replace('__CONTENT__', content)
